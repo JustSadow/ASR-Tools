@@ -1,0 +1,10 @@
+[
+ {
+  "version": "1.8.0",
+  "tag": "v1.8.0",
+  "title": "ASR Tools v1.8.0",
+  "date": "2026-11-18",
+  "notes": "第一個公開版本（ASR Tools = AdvancedSkeleton + Retarget）。\n\n- 新增「版本／更新」：工具右上角，或工具架 ASR Tools 按鈕按右鍵 → Versions / Update。可以看每一版的更新內容，任何一版都能裝（裝舊版就是退回）\n- 拿掉「骨架轉 Mixamo」分頁\n- 雙手武器骨架：「開槍姿勢」改成自己選 FBX（例如 Mixamo 的 Firing Rifle，選一次會記住）\n- 腳趾 rotateZ 不再超過 ±90°；翻滾、躺地的格數不再被當成踩地\n- 各分頁的執行按鈕固定在下方，不會被滾輪捲走\n- 所有動作來源的骨頭對應都內建，套動作不需要安裝 AdvancedSkeleton",
+  "url": "https://github.com/JustSadow/ASR-Tools/releases/download/v1.8.0/ASR_Tools_v1.8.0.zip"
+ }
+]
