@@ -1,5 +1,13 @@
 [
  {
+  "version": "1.8.2",
+  "tag": "v1.8.2",
+  "title": "ASR Tools v1.8.2",
+  "date": "2026-11-18",
+  "notes": "- 修正：工具架 icon 變回舊版的問題（安裝包裡放錯了一組 icon）",
+  "url": "https://github.com/JustSadow/ASR-Tools/releases/download/v1.8.2/ASR_Tools_v1.8.2.zip"
+ },
+ {
   "version": "1.8.1",
   "tag": "v1.8.1",
   "title": "ASR Tools v1.8.1",
