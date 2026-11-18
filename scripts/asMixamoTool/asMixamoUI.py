@@ -292,7 +292,6 @@ class Window(QtWidgets.QDialog):
         self.bt_upd.setToolTip(u"檢查新版、看更新內容、退回舊版")
         self.bt_upd.clicked.connect(self._open_updater)
         top.addWidget(self.bt_upd)
-        QtCore.QTimer.singleShot(1500, self._check_update_bg)
         tabs = QtWidgets.QTabWidget()
         self.opt = {}
         self.tab_retarget = self._scroll(self._build_scene())
@@ -2000,44 +1999,14 @@ class Window(QtWidgets.QDialog):
 
     # ------------------------------------------------------------------------------------------ updates
     def _open_updater(self):
+        """Look for versions only when asked (no automatic check)."""
+        for k in ("upd_checked", "upd_new"):          # leftovers of the automatic check in v1.8.0
+            self.settings.remove(k)
         try:
             import asrUpdater
         except ImportError:
             return self._warn(u"找不到 asrUpdater.py（請用最新的安裝包重新安裝一次）")
         asrUpdater.show(self)
-
-    def _check_update_bg(self):
-        """Once a day, ask GitHub in the background whether a newer version exists; if so, mark the button."""
-        import threading
-        import time as _t
-        try:
-            import asrUpdater
-        except ImportError:
-            return
-        last = float(self.settings.value("upd_checked", 0) or 0)
-        if _t.time() - last < 20 * 3600 and not self.settings.value("upd_new"):
-            return
-        box = {}
-
-        def work():
-            box["r"] = asrUpdater.newer_release()
-        th = threading.Thread(target=work, daemon=True)
-        th.start()
-
-        def poll(n=[0]):
-            n[0] += 1
-            if th.is_alive() and n[0] < 40:
-                return QtCore.QTimer.singleShot(250, poll)
-            r = box.get("r")
-            self.settings.setValue("upd_checked", _t.time())
-            self.settings.setValue("upd_new", r["tag"] if r else "")
-            try:
-                if r:
-                    self.bt_upd.setText(u"有新版 %s" % r["tag"])
-                    self.bt_upd.setStyleSheet("background:#2e7d32; color:white; font-weight:bold;")
-            except RuntimeError:
-                pass   # window closed meanwhile
-        QtCore.QTimer.singleShot(250, poll)
 
     def _busy(self, on):
         for name in ("cv_run", "bt_run", "rec_run", "wt_run"):

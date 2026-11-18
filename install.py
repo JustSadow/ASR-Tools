@@ -53,6 +53,11 @@ def _install(log=print):
     dst_wt = os.path.join(scripts, "weightTransfer.py")
     if os.path.isfile(dst_wt):
         shutil.copy2(dst_wt, dst_wt.replace(".py", "_backup_%s.py.bak" % stamp))
+        for f in sorted(x for x in os.listdir(scripts) if x.startswith("weightTransfer_backup_"))[:-5]:
+            try:
+                os.remove(os.path.join(scripts, f))      # keep the 5 newest
+            except OSError:
+                pass
     shutil.copy2(os.path.join(HERE, "scripts", "weightTransfer.py"), dst_wt)
     for f in os.listdir(os.path.join(HERE, "icons")):
         shutil.copy2(os.path.join(HERE, "icons", f), os.path.join(icons, f))

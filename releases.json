@@ -1,5 +1,13 @@
 [
  {
+  "version": "1.8.1",
+  "tag": "v1.8.1",
+  "title": "ASR Tools v1.8.1",
+  "date": "2026-11-18",
+  "notes": "- 「版本／更新」不再自動檢查：按了才去 GitHub 找新版（修正 v1.8.0 剛更新完會一直顯示「有新版」的問題）\n- 工具和 weightTransfer 的舊版備份都只保留最近 5 份\n- 這一版也用來測試從 v1.8.0 直接更新",
+  "url": "https://github.com/JustSadow/ASR-Tools/releases/download/v1.8.1/ASR_Tools_v1.8.1.zip"
+ },
+ {
   "version": "1.8.0",
   "tag": "v1.8.0",
   "title": "ASR Tools v1.8.0",
