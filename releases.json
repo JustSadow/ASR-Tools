@@ -1,5 +1,13 @@
 [
  {
+  "version": "1.9.1",
+  "tag": "v1.9.1",
+  "title": "ASR Tools v1.9.1",
+  "date": "2026-11-20",
+  "notes": "- 修正：錄影 MP4 在某些電腦會失敗（WinError 206 檔名或副檔名太長）。Maya 不能直接輸出 H.264 時會改用 Blender 轉檔，以前把每一格的檔案路徑都放在命令列上，格數多或循環次數多就超過 Windows 的長度上限；現在改用清單檔\n- 錄影找 Blender 時也會找 D／E／F 槽的 Program Files 和系統 PATH，並選最新的版本",
+  "url": "https://github.com/JustSadow/ASR-Tools/releases/download/v1.9.1/ASR_Tools_v1.9.1.zip"
+ },
+ {
   "version": "1.9.0",
   "tag": "v1.9.0",
   "title": "ASR Tools v1.9.0",

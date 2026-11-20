@@ -6,6 +6,7 @@ MP4: Maya's own QuickTime H.264 playblast, then the .mov header is turned into a
 chosen frame rate (no re-encoding). GIF: PNG frames encoded by asMixamoGif (in the background worker)."""
 import glob
 import os
+import re
 import shutil
 import struct
 import tempfile
@@ -500,29 +501,39 @@ def flatten_pngs(pngs, cb=None):
 def _png_to_mp4_blender(pngs, out, fps, cb):
     """Fallback when Maya has no H.264 movie support: encode with Blender if it is installed."""
     import subprocess
-    exe = None
-    for root in (r"C:\Program Files\Blender Foundation",):
-        for b in sorted(glob.glob(os.path.join(root, "Blender*", "blender.exe")), reverse=True):
-            exe = b
-            break
+    exe = shutil.which("blender")
+    if not exe:
+        roots = [d + r":\Program Files\Blender Foundation" for d in "CDEF"] + \
+                [os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "Blender Foundation")]
+        found = []
+        for root in roots:
+            found += glob.glob(os.path.join(root, "Blender*", "blender.exe"))
+        if found:      # newest version: compare the numbers, so 4.10 sorts after 4.5
+            exe = max(found, key=lambda p: [int(x) for x in re.findall(r"\d+", os.path.basename(os.path.dirname(p)))] or [0])
     if not exe:
         raise RuntimeError(u"這台電腦的 Maya 不能輸出 H.264，也找不到 Blender；請改用 GIF 或 PNG")
     script = os.path.join(os.path.dirname(pngs[0]), "_enc.py")
     with open(script, "w", encoding="utf-8") as f:
         f.write(
-            "import bpy,sys\n"
-            "a=sys.argv[sys.argv.index('--')+1:]\nfiles=a[2:]\nscn=bpy.context.scene\n"
+            "import bpy,sys,json\n"
+            "a=sys.argv[sys.argv.index('--')+1:]\nfiles=json.load(open(a[2],encoding='utf-8'))\nscn=bpy.context.scene\n"
             "img=bpy.data.images.load(files[0]);w,h=img.size\n"
             "scn.render.resolution_x,scn.render.resolution_y=w-w%2,h-h%2;scn.render.resolution_percentage=100\n"
             "scn.render.fps=int(a[1]);scn.frame_start=1;scn.frame_end=len(files)\n"
             "scn.sequence_editor_create()\n"
-            "st=scn.sequence_editor.sequences.new_image('f',files[0],channel=1,frame_start=1)\n"
+            "se=scn.sequence_editor;coll=getattr(se,'strips',None) or se.sequences\n"
+            "st=coll.new_image('f',files[0],channel=1,frame_start=1)\n"
             "import os\n[st.elements.append(os.path.basename(x)) for x in files[1:]]\n"
             "scn.render.image_settings.file_format='FFMPEG';scn.render.ffmpeg.format='MPEG4';scn.render.ffmpeg.codec='H264'\n"
             "scn.render.ffmpeg.constant_rate_factor='HIGH';scn.render.filepath=a[0];scn.render.use_sequencer=True\n"
             "bpy.ops.render.render(animation=True)\n")
+    # the frame list goes in a file: hundreds of paths on the command line overflow Windows' 32k limit (WinError 206)
+    import json
+    lst = os.path.join(os.path.dirname(pngs[0]), "_frames.json")
+    with open(lst, "w", encoding="utf-8") as f:
+        json.dump(pngs, f, ensure_ascii=False)
     log(cb, u"用 Blender 轉 MP4…")
-    subprocess.run([exe, "-b", "--factory-startup", "--python", script, "--", out, str(int(fps))] + pngs,
+    subprocess.run([exe, "-b", "--factory-startup", "--python", script, "--", out, str(int(fps)), lst],
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
