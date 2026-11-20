@@ -1,5 +1,13 @@
 [
  {
+  "version": "1.9.0",
+  "tag": "v1.9.0",
+  "title": "ASR Tools v1.9.0",
+  "date": "2026-11-20",
+  "notes": "新增「匯出 FBX」分頁：一鍵把目前的 rig 匯出成遊戲用的 FBX。\n\n- 只帶骨架（DeformationSystem）和蒙皮模型（Geometry），控制器和其他 rig 節點都不會帶出去\n- 可勾選「含動畫」（指定影格範圍，每格烘焙到每一根骨頭）；不勾就是蒙皮時的姿勢（bind pose）、沒有動畫\n- 帶槍的 rig 可勾選「含槍」：一起匯出武器骨頭 Gun_Weapon 和槍模型 Gun_Geo\n- 手持武器的 rig 可勾選「含武器」：一起匯出武器骨頭（例如 Weapon_Joint）和只蒙皮在武器骨頭上的武器模型；不勾就都不匯出\n- 在背景處理，目前場景不會被修改，Maya 可以繼續用\n- 匯出的骨架和 Maya 裡看到的完全一致（每一根骨頭 0 cm 誤差，含 AdvancedSkeleton 的 offsetParentMatrix 骨頭）",
+  "url": "https://github.com/JustSadow/ASR-Tools/releases/download/v1.9.0/ASR_Tools_v1.9.0.zip"
+ },
+ {
   "version": "1.8.2",
   "tag": "v1.8.2",
   "title": "ASR Tools v1.8.2",

@@ -309,6 +309,10 @@ class Window(QtWidgets.QDialog):
         self.tab_wt = self._scroll(self._build_weights())
         self._pin(self.tab_wt, [self.wt_run])
         tabs.addTab(self.tab_wt, u"模型更新")
+        self.tab_ex = self._scroll(self._build_export())
+        self._pin(self.tab_ex, [self.ex_run])
+        tabs.addTab(self.tab_ex, u"匯出 FBX")
+        tabs.currentChanged.connect(lambda i: self._ex_refresh() if tabs.widget(i) is self.tab_ex else None)
         self.tab_rec = self._build_record()
         tabs.addTab(self.tab_rec, u"錄影")
         tabs.currentChanged.connect(lambda i: self._rec_default_out() if tabs.widget(i) is self.tab_rec else None)
@@ -1969,6 +1973,15 @@ class Window(QtWidgets.QDialog):
                 else:
                     self.log.appendPlainText(u"GIF 失敗：" + ev.get("error", ""))
                     self.bt_log.setChecked(True)
+            elif t == "export":
+                self.progress.setValue(1)
+                if ev["ok"]:
+                    self.log.appendPlainText(u"匯出完成（%.1f MB）：%s\n  %s" % (ev["size"] / 1048576.0, ev["out"], ev["msg"]))
+                    QtWidgets.QMessageBox.information(self, TITLE, u"匯出完成：\n%s\n\n%s" % (ev["out"], ev["msg"]))
+                else:
+                    self.log.appendPlainText(u"匯出失敗：" + ev["msg"])
+                    self.bt_log.setChecked(True)
+                    self._warn(u"匯出失敗：" + ev["msg"])
             elif t == "convert":
                 self.progress.setValue(1)
                 if ev["ok"]:
@@ -1997,6 +2010,134 @@ class Window(QtWidgets.QDialog):
             if h > 300:
                 self.split.setSizes([h - 140, 140])
 
+    # ------------------------------------------------------------------------------------------ export FBX
+    def _build_export(self):
+        w = QtWidgets.QWidget()
+        v = QtWidgets.QVBoxLayout(w)
+        info = QtWidgets.QLabel(u"把目前打開的 rig 匯出成遊戲用的 FBX：只有骨架（DeformationSystem）和蒙皮模型（Geometry），"
+                                u"控制器和其他 rig 節點都不會帶出去。<br>在背景處理，目前場景不會被修改。")
+        info.setWordWrap(True)
+        info.setStyleSheet("color:#aaa")
+        v.addWidget(info)
+        g = QtWidgets.QGridLayout()
+        g.addWidget(QtWidgets.QLabel(u"目前場景"), 0, 0)
+        self.ex_scene = QtWidgets.QLabel("-")
+        self.ex_scene.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        g.addWidget(self.ex_scene, 0, 1)
+        b = QtWidgets.QPushButton(u"重新整理")
+        b.clicked.connect(lambda: self._ex_refresh())
+        g.addWidget(b, 0, 2)
+        self.ex_anim = QtWidgets.QCheckBox(u"含動畫")
+        self.ex_anim.setChecked(self.settings.value("ex_anim", "true") == "true")
+        g.addWidget(self.ex_anim, 1, 0)
+        row = QtWidgets.QHBoxLayout()
+        row.addWidget(QtWidgets.QLabel(u"影格"))
+        self.ex_start, self.ex_end = QtWidgets.QSpinBox(), QtWidgets.QSpinBox()
+        for sp in (self.ex_start, self.ex_end):
+            sp.setRange(-100000, 100000)
+        row.addWidget(self.ex_start)
+        row.addWidget(QtWidgets.QLabel(u"到"))
+        row.addWidget(self.ex_end)
+        b = QtWidgets.QPushButton(u"跟時間軸")
+        b.clicked.connect(lambda: self._ex_refresh(range_only=True))
+        row.addWidget(b)
+        row.addWidget(self._help(u"<span style='color:#f0b860'>勾選</span>：把這段影格的動作烘焙到每一根骨頭（每格一個 key）。<br>"
+                                 u"<span style='color:#f0b860'>不勾</span>：只匯出 bind pose 的骨架和模型，沒有動畫（給引擎建角色用）。"))
+        row.addStretch(1)
+        g.addLayout(row, 1, 1, 1, 2)
+        self.ex_anim.toggled.connect(lambda on: [x.setEnabled(on) for x in (self.ex_start, self.ex_end)])
+        self.ex_gun = QtWidgets.QCheckBox(u"含槍（GunRig）")
+        self.ex_gun.setChecked(self.settings.value("ex_gun", "true") == "true")
+        g.addWidget(self.ex_gun, 2, 0)
+        self.ex_gun_note = QtWidgets.QLabel("")
+        self.ex_gun_note.setStyleSheet("color:#888")
+        row = QtWidgets.QHBoxLayout()
+        row.addWidget(self.ex_gun_note)
+        row.addWidget(self._help(u"帶槍的 rig（用「雙手武器骨架」做的）：<br>"
+                                 u"<span style='color:#f0b860'>勾選</span>：一起匯出武器骨頭 Gun_Weapon（在右手下）和槍模型 Gun_Geo。<br>"
+                                 u"<span style='color:#f0b860'>不勾</span>：只有角色本身。"))
+        row.addStretch(1)
+        g.addLayout(row, 2, 1, 1, 2)
+        self.ex_wpn = QtWidgets.QCheckBox(u"含武器（Weapon）")
+        self.ex_wpn.setChecked(self.settings.value("ex_wpn", "true") == "true")
+        g.addWidget(self.ex_wpn, 3, 0)
+        self.ex_wpn_note = QtWidgets.QLabel("")
+        self.ex_wpn_note.setStyleSheet("color:#888")
+        row = QtWidgets.QHBoxLayout()
+        row.addWidget(self.ex_wpn_note)
+        row.addWidget(self._help(u"手持武器的 rig（例如 Weapon_Joint 掛在右手、或可切換左右手的 Weapon 骨頭）：<br>"
+                                 u"<span style='color:#f0b860'>勾選</span>：一起匯出武器骨頭和只蒙皮在武器骨頭上的武器模型。<br>"
+                                 u"<span style='color:#f0b860'>不勾</span>：武器骨頭和武器模型都不匯出。"))
+        row.addStretch(1)
+        g.addLayout(row, 3, 1, 1, 2)
+        g.addWidget(QtWidgets.QLabel(u"輸出 FBX"), 4, 0)
+        self.ex_out = QtWidgets.QLineEdit()
+        g.addWidget(self.ex_out, 4, 1)
+        b = QtWidgets.QPushButton(u"另存為")
+        b.clicked.connect(self._ex_pick_out)
+        g.addWidget(b, 4, 2)
+        g.setColumnStretch(1, 1)
+        v.addLayout(g)
+        v.addStretch(1)
+        self.ex_run = QtWidgets.QPushButton(u"匯出 FBX（背景處理，Maya 可繼續用）")
+        self.ex_run.setMinimumHeight(36)
+        self.ex_run.clicked.connect(self._ex_start)
+        v.addWidget(self.ex_run)
+        return w
+
+    def _ex_refresh(self, range_only=False):
+        import maya.cmds as cmds
+        from . import asMixamoExport as ex
+        info = ex.scene_info()
+        self.ex_start.setValue(int(info["range"][0]))
+        self.ex_end.setValue(int(info["range"][1]))
+        if range_only:
+            return
+        scene = cmds.file(q=True, sceneName=True)
+        name = os.path.basename(scene) if scene else u"（未存檔的場景）"
+        self.ex_scene.setText(name + ("" if info["as"] else u"　✘ 不是 AS rig"))
+        self.ex_scene.setStyleSheet("" if info["as"] else "color:#ff7070")
+        self.ex_gun.setEnabled(info["gun"])
+        self.ex_gun_note.setText(u"這個 rig 有槍" if info["gun"] else u"這個 rig 沒有槍")
+        self.ex_wpn.setEnabled(info["weapon"])
+        self.ex_wpn_note.setText(u"這個 rig 有武器" if info["weapon"] else u"這個 rig 沒有武器")
+        if scene:
+            folder = self.settings.value("ex_dir", "") or os.path.dirname(scene)
+            self.ex_out.setText(os.path.join(folder, os.path.splitext(os.path.basename(scene))[0] + ".fbx").replace("\\", "/"))
+        self.ex_anim.setChecked(bool(info["animated"]))
+
+    def _ex_pick_out(self):
+        p, _ = QtWidgets.QFileDialog.getSaveFileName(self, u"輸出 FBX", self.ex_out.text(), "FBX (*.fbx)")
+        if p:
+            self.ex_out.setText(p)
+
+    def _ex_start(self):
+        import maya.cmds as cmds
+        from . import asMixamoExport as ex
+        info = ex.scene_info()
+        if not info["as"]:
+            return self._warn(u"目前場景不是 AdvancedSkeleton 的 rig（找不到 DeformationSystem）")
+        out = self.ex_out.text().strip()
+        if not out:
+            return self._warn(u"請設定輸出 FBX 的位置")
+        if not out.lower().endswith(".fbx"):
+            out += ".fbx"
+        if os.path.exists(out) and not self._ask(u"%s 已經存在，要覆蓋嗎？" % os.path.basename(out)):
+            return
+        anim, gun = self.ex_anim.isChecked(), self.ex_gun.isChecked() and info["gun"]
+        weapon = self.ex_wpn.isChecked() and info["weapon"]
+        self.settings.setValue("ex_wpn", "true" if self.ex_wpn.isChecked() else "false")
+        self.settings.setValue("ex_anim", "true" if anim else "false")
+        self.settings.setValue("ex_gun", "true" if self.ex_gun.isChecked() else "false")
+        self.settings.setValue("ex_dir", os.path.dirname(out))
+        tmp = os.path.join(tempfile.mkdtemp(prefix="asrExport_"), "scene.mb")
+        sel = cmds.ls(selection=True)
+        cmds.file(tmp, exportAll=True, type="mayaBinary", force=True, preserveReferences=False)
+        if sel:
+            cmds.select(sel, replace=True)
+        self._run({"mode": "export", "scene": tmp, "out": out, "anim": anim, "gun": gun, "weapon": weapon,
+                   "start": self.ex_start.value(), "end": self.ex_end.value()}, 1)
+
     # ------------------------------------------------------------------------------------------ updates
     def _open_updater(self):
         """Look for versions only when asked (no automatic check)."""
@@ -2009,7 +2150,7 @@ class Window(QtWidgets.QDialog):
         asrUpdater.show(self)
 
     def _busy(self, on):
-        for name in ("cv_run", "bt_run", "rec_run", "wt_run"):
+        for name in ("cv_run", "bt_run", "rec_run", "wt_run", "ex_run"):
             b = getattr(self, name, None)
             if b is not None:
                 b.setEnabled(not on)

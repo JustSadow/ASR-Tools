@@ -98,6 +98,25 @@ def main():
                 emit(type="item", index=i, state="error", msg=str(e))
                 emit(type="log", msg=traceback.format_exc())
 
+    elif job["mode"] == "export":
+        import asMixamoExport as ex
+        try:
+            r = ex.export_rig_fbx(job["scene"], job["out"], anim=job.get("anim", True), gun=job.get("gun", True),
+                                  start=job.get("start"), end=job.get("end"), cb=cb, weapon=job.get("weapon", True))
+            msg = u"%d 根骨頭、模型 %s" % (r["joints"], u"、".join(r["meshes"]))
+            msg += (u"、動畫 %d-%d" % r["range"]) if r["anim"] else u"、不含動畫（bind pose）"
+            msg += u"、含槍" if r["gun"] else ""
+            msg += u"、含武器" if r["weapon"] else ""
+            emit(type="export", ok=True, out=r["out"], msg=msg, size=r["size"])
+        except Exception as e:
+            emit(type="export", ok=False, msg=str(e))
+            emit(type="log", msg=traceback.format_exc())
+        finally:
+            try:
+                os.remove(job["scene"])
+            except OSError:
+                pass
+
     elif job["mode"] == "batch":
         items = job["items"]
         for i, it in enumerate(items):

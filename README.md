@@ -26,6 +26,7 @@ ASR = **A**dvanced**S**keleton + **R**etarget。Maya 2025 用的動作套用工�
 | 批量 Retarget | 一次把多個動作套到 rig，各自另存新檔（背景處理，Maya 可繼續用） |
 | 雙手武器骨架 | 幫 rig 加一把雙手持握的槍（右手持槍、左手 IK 握點、可匯出的武器骨頭） |
 | 模型更新 | 把修好權重的 rig 的 skin 權重換進舊的動作檔 |
+| 匯出 FBX | 一鍵把目前的 rig 匯出成遊戲用 FBX（只有骨架＋蒙皮模型；可選含動畫、含槍、含武器） |
 | 錄影 | 錄 viewport 成 MP4／GIF／PNG |
 
 另有 **Go to Build Pose**（不用裝 AS）與 **WeightTransfer**（權重轉移）。
