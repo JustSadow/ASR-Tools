@@ -348,6 +348,14 @@ class Window(QtWidgets.QDialog):
         self._show_log(self.bt_log.isChecked())
         tabs.setCurrentIndex(int(self.settings.value("tab_v3", 0)))   # v3: the 骨架轉 Mixamo tab was removed
         tabs.currentChanged.connect(lambda i: self.settings.setValue("tab_v3", i))
+        self._scene_jobs = []
+        if self._cmds():      # opening / saving another scene refreshes the scene names and the default output names
+            try:
+                import maya.api.OpenMaya as om
+                for msg in (om.MSceneMessage.kAfterOpen, om.MSceneMessage.kAfterNew, om.MSceneMessage.kAfterSave):
+                    self._scene_jobs.append(om.MSceneMessage.addCallback(msg, self._on_scene_changed))
+            except Exception:
+                pass
         for b in self.findChildren(QtWidgets.QPushButton):      # the big "run" buttons get the accent colour
             if b.minimumHeight() >= 34:
                 b.setObjectName("primary")
@@ -972,6 +980,34 @@ class Window(QtWidgets.QDialog):
             self.progress.setRange(0, 1)
             self.progress.setValue(1)
             self.ar_run.setEnabled(True)
+
+    def _on_scene_changed(self, *a):
+        """Another scene was opened / created / saved under a new name: follow it (a name typed for the previous
+        scene no longer applies)."""
+        def run():
+            try:
+                self._rec_out_edited = False
+                self._rec_default_out()
+            except Exception:
+                pass
+            for f in (getattr(self, "_ex_refresh", None), getattr(self, "_scene_refresh", None)):
+                try:
+                    f and f()
+                except Exception:
+                    pass
+        try:
+            QtCore.QTimer.singleShot(0, run)
+        except RuntimeError:     # window already deleted
+            pass
+
+    def _kill_scene_jobs(self):
+        for j in getattr(self, "_scene_jobs", []) or []:
+            try:
+                import maya.api.OpenMaya as om
+                om.MMessage.removeCallback(j)
+            except Exception:
+                pass
+        self._scene_jobs = []
 
     def _cmds(self):
         try:
@@ -2303,6 +2339,7 @@ class Window(QtWidgets.QDialog):
             except Exception:
                 pass
             self._gate_state = None
+        self._kill_scene_jobs()
         e.accept()
         super().closeEvent(e)
 
@@ -2316,6 +2353,8 @@ def _close_all():
                     from . import asMixamoRecord as rec
                     rec.hide_gate(w._gate_state)
                     w._gate_state = None
+                if hasattr(w, "_kill_scene_jobs"):
+                    w._kill_scene_jobs()
                 w.hide()
                 w.deleteLater()
         except RuntimeError:

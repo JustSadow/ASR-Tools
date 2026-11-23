@@ -1,5 +1,13 @@
 [
  {
+  "version": "1.9.2",
+  "tag": "v1.9.2",
+  "title": "ASR Tools v1.9.2",
+  "date": "2026-11-23",
+  "notes": "- 修正：不重開 Maya、直接開別的檔案時，「錄影」的輸出檔名不會跟著換（要關掉工具再開才會更新）。現在開檔、開新場景、另存新檔時，錄影和「匯出 FBX」的輸出檔名、Retarget 的目前場景都會自動更新（感謝 Michael 回報）",
+  "url": "https://github.com/JustSadow/ASR-Tools/releases/download/v1.9.2/ASR_Tools_v1.9.2.zip"
+ },
+ {
   "version": "1.9.1",
   "tag": "v1.9.1",
   "title": "ASR Tools v1.9.1",
