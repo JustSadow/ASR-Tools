@@ -111,9 +111,18 @@ def install(release, log=print):
     try:
         zpath = os.path.join(tmp, "pkg.zip")
         log(u"下載 %s …" % release["tag"])
-        req = urllib.request.Request(release["url"], headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=60) as r, open(zpath, "wb") as f:
-            shutil.copyfileobj(r, f)
+        url = release["url"]
+        # tags are case-sensitive in download URLs: a release tagged "V1.2.3" instead of "v1.2.3" is still found
+        alt = re.sub(r"/download/([vV])", lambda m: "/download/" + ("V" if m.group(1) == "v" else "v"), url, count=1)
+        for i, u in enumerate([url] + ([alt] if alt != url else [])):
+            try:
+                req = urllib.request.Request(u, headers={"User-Agent": UA})
+                with urllib.request.urlopen(req, timeout=60) as r, open(zpath, "wb") as f:
+                    shutil.copyfileobj(r, f)
+                break
+            except urllib.error.HTTPError as e:
+                if e.code != 404 or i == 1 or alt == url:
+                    raise
         ext = os.path.join(tmp, "pkg")
         with zipfile.ZipFile(zpath) as zf:
             _safe_extract(zf, ext)

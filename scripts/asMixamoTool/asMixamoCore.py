@@ -329,6 +329,13 @@ for _f in ("Thumb", "Index", "Middle", "Ring", "Pinky"):
     _UNREAL_MAP.update({"%sFinger%d" % (_f, _n): "%s_0%d" % (_f.lower(), _n) for _n in (1, 2, 3)})
 _UNREAL_SIDE = {"right": "r", "left": "l", "middle": "", "before": False, "underscore": True}
 
+# AdvancedSkeleton deform joints (Root_M, Hip_L ...): motion exported from another AS rig, e.g. with the 匯出 FBX tab
+_AS_MAP = {b: b for b in ("Root", "Spine1", "Chest", "Neck", "Head", "HeadEnd", "Scapula", "Shoulder", "Elbow", "Wrist",
+                          "Hip", "Knee", "Ankle", "Toes", "ToesEnd")}
+for _f in ("Thumb", "Index", "Middle", "Ring", "Pinky"):
+    _AS_MAP.update({"%sFinger%d" % (_f, _n): "%sFinger%d" % (_f, _n) for _n in (1, 2, 3, 4)})
+_AS_SIDE = {"right": "R", "left": "L", "middle": "M", "before": False, "underscore": True}
+
 try:
     from . import asMixamoSources as _tables
 except ImportError:           # imported as a top-level module (background worker)
@@ -341,7 +348,8 @@ def list_sources():
     out = [Source("mixamo", u"Mixamo 預設角色（Y Bot／X Bot）", True),
            Source("custom", u"客製模型（自己上傳 Mixamo 的版本）", False),
            Source("Biped", u"3ds Max Biped（Bip001，Asset Store 動作包常見）", True, _BIPED_MAP, _BIPED_SIDE),
-           Source("Unreal", u"Unreal（pelvis／spine_01／upperarm_l，UE 與部分 Unity 動作包）", True, _UNREAL_MAP, _UNREAL_SIDE)]
+           Source("Unreal", u"Unreal（pelvis／spine_01／upperarm_l，UE 與部分 Unity 動作包）", True, _UNREAL_MAP, _UNREAL_SIDE),
+           Source("AdvancedSkeleton", u"AdvancedSkeleton 角色（Root_M／Hip_L，別隻 AS 角色匯出的 FBX）", True, _AS_MAP, _AS_SIDE)]
     for key, label, mapping, side in _tables.TABLES:
         out.append(Source(key, label, True, dict(mapping), dict(side)))
     return out
@@ -762,6 +770,54 @@ def disconnect_mocap():
         cmds.delete(refs)
 
 
+def _source_skin_bind(ns, top):
+    """{joint long name: world matrix at skin bind} for the joints under `top` that a skinned mesh in the motion file
+    uses (inverse bindPreMatrix), or None when the file has no skin (skeleton-only FBX)."""
+    import maya.api.OpenMaya as om
+    under = set(cmds.listRelatives(top, allDescendents=True, type="joint", fullPath=True) or [])
+    under.add(cmds.ls(top, long=True)[0])
+    out = {}
+    for sc in cmds.ls(ns + ":*", type="skinCluster") + cmds.ls(ns + ":*:*", type="skinCluster"):
+        for idx in cmds.getAttr(sc + ".matrix", multiIndices=True) or []:
+            j = cmds.listConnections("%s.matrix[%d]" % (sc, idx), s=True, d=False)
+            if j:
+                j = cmds.ls(j[0], long=True)[0]
+                if j in under:
+                    out.setdefault(j, list(om.MMatrix(cmds.getAttr("%s.bindPreMatrix[%d]" % (sc, idx))).inverse()))
+    return out if len(out) >= 10 else None
+
+
+def _bind_foot_pitch(ns, standard, mats):
+    """Like flat_foot_pitch's result, but exact: the source's flat foot is its bind foot (slope and ankle/toes matrices)."""
+    res = {"toes": {}}
+    for side in "LR":
+        fa = _find_mocap(ns, source_name("Ankle_" + side, standard))
+        fb = _find_mocap(ns, source_name("Toes_" + side, standard))
+        fa, fb = [cmds.ls(x, long=True)[0] if x else None for x in (fa, fb)]
+        if not (fa in mats and fb in mats):
+            res[side] = None
+            continue
+        ma, mb = mats[fa], mats[fb]
+        v = [mb[12] - ma[12], mb[13] - ma[13], mb[14] - ma[14]]
+        res[side] = math.degrees(math.atan2(-v[1], math.hypot(v[0], v[2])))
+        res["toes"][side] = (list(ma), list(mb))
+    return res
+
+
+def _pose_world(mats):
+    """Put joints at their world rotations from `mats` (parents first); positions stay (bone lengths don't change)."""
+    import maya.api.OpenMaya as om
+    for j in sorted(mats or {}, key=lambda n: n.count("|")):
+        if not cmds.objExists(j):
+            continue
+        want = _rot3(om.MMatrix(mats[j]))
+        now = _rot3(om.MMatrix(cmds.xform(j, q=True, ws=True, m=True)))
+        try:
+            _rotate_world(j, om.MTransformationMatrix(now.inverse() * want).rotation(asQuaternion=True))
+        except Exception:
+            pass
+
+
 def zero_out_mocap(ns, zero_top_translate=True, from_node=None):
     """Step 8 of the manual flow at the current frame (-1): top root position = 0, then Select > Hierarchy and
     every rotate = 0 (the top 'Group' node of a Mixamo download can carry a rotation too)."""
@@ -1140,8 +1196,14 @@ def _apply_motion(fbx, reduce=True, precision=3.0, precision_mode=1, euler=True,
     # rest-pose edits made at frame -1 for the whole clip -> key their own values at the start first
     _key_static_channels(hips, start)
     ref_pose = capture_ref_pose(ns, standard, start) if src.foreign else None
-    foot_pitch = flat_foot_pitch(ns, standard, start, end) if src.foreign else None
-    if foot_pitch:
+    # another AS rig's skeleton with its skinned mesh: the skin's bind pose is that character's true rest pose (feet
+    # flat). Use it instead of guessing the flat foot from a planted frame, which copies that frame's small tilt
+    # (the source is itself a retarget) onto every frame
+    src_bind = _source_skin_bind(ns, hips) if src.key == "AdvancedSkeleton" else None
+    foot_pitch = flat_foot_pitch(ns, standard, start, end) if src.foreign and not src_bind else None
+    if src_bind:
+        foot_pitch = _bind_foot_pitch(ns, standard, src_bind)
+    elif foot_pitch:
         foot_pitch["toes"] = {}
         for side, fr in foot_pitch.get("frames", {}).items():
             fa = _find_mocap(ns, source_name("Ankle_" + side, standard))
@@ -1153,6 +1215,7 @@ def _apply_motion(fbx, reduce=True, precision=3.0, precision_mode=1, euler=True,
     cmds.currentTime(-1)
     if src.foreign:
         zero_out_mocap(ns, zero_top_translate=False, from_node=hips)
+        _pose_world(src_bind)
     else:
         zero_out_mocap(ns)
     scale = 1.0
@@ -1175,13 +1238,16 @@ def _apply_motion(fbx, reduce=True, precision=3.0, precision_mode=1, euler=True,
                 ground = low if ground is None else min(ground, low)
             cmds.currentTime(-1)
             zero_out_mocap(ns, zero_top_translate=False, from_node=hips)
+            _pose_world(src_bind)
             align_rest_pose(ns, standard, ref_pose, foot_pitch)
             cur = _ws(hips)
             rest_ank = sum(_ws(f)[1] for f in feet) / len(feet)
             dy = ground - rest_ank
         cmds.xform(hips, ws=True, t=[root[0] / scale, cur[1] + dy, root[2] / scale])
         log(cb, u"    已對齊成 rig 的 bind pose，比例 x%.3f" % scale)
-        if foot_pitch and foot_pitch.get("L") is not None:
+        if src_bind:
+            log(cb, u"    來源是 AS 角色：用它模型綁定時的姿勢（bind pose）當基準，它的平腳對應到 rig 的平腳")
+        elif foot_pitch and foot_pitch.get("L") is not None:
             log(cb, u"    腳掌：來源踩平時腳踝→腳趾斜 %.0f°，對應到 rig 的平腳（踩地時 IK 腳控制器會是平的）" % foot_pitch["L"])
         elif foot_pitch is not None:
             log(cb, u"    腳掌：動作裡沒有踩地的格數，腳掌照骨頭方向對齊")

@@ -58,6 +58,23 @@ def _source_curves(ns):
     return out, layered
 
 
+def _other_character(ns):
+    """Largest bone-length difference (percent) between the rig in the scene and the imported source rig, when it is
+    over 3% (= another character); else 0. Bone lengths don't depend on the pose."""
+    worst = 0.0
+    for a, b in (("Root_M", "Neck_M"), ("Shoulder_L", "Elbow_L"), ("Elbow_L", "Wrist_L"), ("Hip_L", "Knee_L"),
+                 ("Knee_L", "Ankle_L")):
+        sa, sb = cmds.ls("%s:%s" % (ns, a)), cmds.ls("%s:%s" % (ns, b))
+        if not (cmds.objExists(a) and cmds.objExists(b) and sa and sb):
+            continue
+        d = lambda x, y: sum((p - q) ** 2 for p, q in zip(cmds.xform(x, q=True, ws=True, t=True),
+                                                           cmds.xform(y, q=True, ws=True, t=True))) ** 0.5
+        here, there = d(a, b), d(sa[0], sb[0])
+        if here > 1e-6:
+            worst = max(worst, abs(there - here) / here * 100.0)
+    return int(round(worst)) if worst > 3.0 else 0
+
+
 def _bake_source_layers(ns, cb):
     """The source file uses animation layers: bake what they add up to onto its controls (one key per frame),
     so the copy is the motion you actually see in the source."""
@@ -69,7 +86,13 @@ def _bake_source_layers(ns, cb):
             node = p.split(".")[0]
             if cmds.objExists(node) and cmds.objectType(node, isAType="transform"):
                 plugs.add(p)
-    if not plugs or not times:
+    if not plugs:
+        return
+    # the range is every key in the file, not only the layers' keys: a correction layer often has a single key
+    # (a constant offset for the whole clip), and baking only that frame dropped the correction everywhere else
+    for c in cmds.ls(ns + ":*", type=TIME_CURVES) or []:
+        times += cmds.keyframe(c, q=True, tc=True) or []
+    if not times:
         return
     s, e = min(times), max(times)
     log(cb, u"來源檔有 Anim Layer：先把各層加起來的結果烘成 key（%g-%g，每格一個 key）" % (s, e))
@@ -201,6 +224,12 @@ def as_retarget(src, parts=None, layer=None, others=True, cb=None):
             if src_unit and src_unit != unit:
                 cmds.currentUnit(time=unit, updateAnimation=False)
     result = {"curves": 0, "controls": set(), "skipped": [], "layer": None, "start": None, "end": None}
+    diff = _other_character(ns)
+    if diff:
+        result["otherCharacter"] = diff
+        log(cb, u"⚠ 來源和目前場景看起來不是同一隻角色（骨頭長度差 %d%%）：這裡是照抄控制器數值，"
+                u"兩隻的 bind pose 不同（例如 A-pose 和 T-pose）時手腳會整段偏掉。"
+                u"換角色請用「Retarget」分頁：在來源檔用「匯出 FBX」導出，再套到這隻角色。" % diff)
     try:
         with _NoUndo():
             curves, layered = _source_curves(ns)

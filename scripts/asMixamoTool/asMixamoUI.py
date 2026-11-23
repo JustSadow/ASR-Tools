@@ -965,10 +965,15 @@ class Window(QtWidgets.QDialog):
                     asrt.copy_layers(src, names, parts=parts, others=self.ar_others.isChecked(), cb=cb,
                                      base_plugs=base_plugs)
                 else:
-                    asrt.as_retarget(src, parts=parts, layer=layer, others=self.ar_others.isChecked(), cb=cb)
+                    res = asrt.as_retarget(src, parts=parts, layer=layer, others=self.ar_others.isChecked(), cb=cb)
             finally:
                 cmds.refresh(suspend=False)
             cmds.refresh()
+            if not layers_mode and res.get("otherCharacter"):
+                self._warn(u"來源和目前場景看起來不是同一隻角色（骨頭長度差 %d%%）。\n\n"
+                           u"AS Retarget 是照抄控制器數值，兩隻的 bind pose 不同（例如 A-pose 和 T-pose）時，"
+                           u"手腳會整段偏掉。\n\n換角色請改用「Retarget」分頁：在來源檔用「匯出 FBX」導出動作，"
+                           u"再套到這隻角色。" % res["otherCharacter"])
         except Exception as e:
             import traceback
             self.log.appendPlainText(u"失敗：%s\n%s" % (e, traceback.format_exc()))

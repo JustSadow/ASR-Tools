@@ -1,5 +1,13 @@
 [
  {
+  "version": "1.9.3",
+  "tag": "v1.9.3",
+  "title": "ASR Tools v1.9.3",
+  "date": "2026-11-23",
+  "notes": "- 新增：Retarget 可以吃別隻 AdvancedSkeleton 角色的動作（骨頭名稱 Root_M／Hip_L 這種）。例如把修好的角色動作用「匯出 FBX」導出，再套到其他角色；會自動認出來源，也可以手動選「AdvancedSkeleton 角色」。FBX 裡有模型時，會用來源角色的 bind pose 當基準，平腳對平腳\n- 修正：AS Retarget 選「整段動作」時，如果來源檔有 Anim Layer 而且修正層只有一格 key（整段固定偏移），以前只會把那一格的修正搬過來，其他格都沒有修正（例如 IK 腳跑掉）。現在會烘整段動作的範圍，不用再先手動合併 layer\n- 版本管理：下載時如果 GitHub 上的版本標籤大小寫不同（V1.2.3／v1.2.3），會自動改用另一種再試\n- AS Retarget：偵測到來源和目前場景不是同一隻角色時會跳提醒。AS Retarget 是照抄控制器數值，兩隻的 bind pose 不同（例如 A-pose 和 T-pose）時手腳會整段偏掉，換角色請改用 Retarget 分頁＋「匯出 FBX」",
+  "url": "https://github.com/JustSadow/ASR-Tools/releases/download/v1.9.3/ASR_Tools_v1.9.3.zip"
+ },
+ {
   "version": "1.9.2",
   "tag": "V1.9.2",
   "title": "ASR Tools v1.9.2",
