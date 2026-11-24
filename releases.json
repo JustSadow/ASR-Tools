@@ -1,5 +1,13 @@
 [
  {
+  "version": "1.9.4",
+  "tag": "v1.9.4",
+  "title": "ASR Tools v1.9.4",
+  "date": "2026-11-24",
+  "notes": "- 修正：Retarget 勾「In Place」時腳掌會整段歪掉（有移動的動作，例如跑步收尾）。以前先扣掉移動才判斷腳什麼時候踩地，踩地的腳變成往後滑、被當成滑步排除，平腳基準就抓錯了；現在先判斷踩地再扣掉移動，開不開 In Place 腳掌都一樣平",
+  "url": "https://github.com/JustSadow/ASR-Tools/releases/download/v1.9.4/ASR_Tools_v1.9.4.zip"
+ },
+ {
   "version": "1.9.3",
   "tag": "v1.9.3",
   "title": "ASR Tools v1.9.3",

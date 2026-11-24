@@ -1188,10 +1188,6 @@ def _apply_motion(fbx, reduce=True, precision=3.0, precision_mode=1, euler=True,
             log(cb, u"    只套用 %d 根骨頭" % len(parts))
 
     cmds.currentTime(-1)
-    if in_place:
-        dx, dz = make_in_place(hips, start, end)
-        log(cb, u"    In Place：去掉位移 X %.1f、Z %.1f（來源單位）" % (dx, dz) if (dx or dz) else u"    In Place：本來就在原地")
-        cmds.currentTime(-1)
     # channels without animation (e.g. a Biped pelvis: its motion lives on Bip001 above it) would keep the
     # rest-pose edits made at frame -1 for the whole clip -> key their own values at the start first
     _key_static_channels(hips, start)
@@ -1211,6 +1207,13 @@ def _apply_motion(fbx, reduce=True, precision=3.0, precision_mode=1, euler=True,
             if fa and fb:
                 cmds.currentTime(fr)
                 foot_pitch["toes"][side] = (cmds.xform(fa, q=True, ws=True, m=True), cmds.xform(fb, q=True, ws=True, m=True))
+    # In Place only after the planted feet were found: with the travel removed a planted foot slides backwards, its
+    # frames no longer count as planted, and the flat-foot slope came out wrong (feet tilted for the whole clip)
+    cmds.currentTime(-1)
+    if in_place:
+        dx, dz = make_in_place(hips, start, end)
+        log(cb, u"    In Place：去掉位移 X %.1f、Z %.1f（來源單位）" % (dx, dz) if (dx or dz) else u"    In Place：本來就在原地")
+        cmds.currentTime(-1)
     del _TWIST_FIXED[:]
     cmds.currentTime(-1)
     if src.foreign:
