@@ -1,5 +1,13 @@
 [
  {
+  "version": "1.9.5",
+  "tag": "v1.9.5",
+  "title": "ASR Tools v1.9.5",
+  "date": "2026-11-27",
+  "notes": "- 套用部位：手掌的 Cup（掌心靠無名指／小指那側）變成可以單獨選，不再跟手掌綁在一起。只有 rig 有 Cup 骨頭時才能選（沒有的會是灰色）；動作檔都沒有 Cup，所以 Retarget 分頁裡它一直是灰色，AS Retarget 從同一隻角色的檔案搬動作時才用得到\n- 以前存的部位選擇有選手掌的，更新後 Cup 會自動一起選上",
+  "url": "https://github.com/JustSadow/ASR-Tools/releases/download/v1.9.5/ASR_Tools_v1.9.5.zip"
+ },
+ {
   "version": "1.9.4",
   "tag": "v1.9.4",
   "title": "ASR Tools v1.9.4",

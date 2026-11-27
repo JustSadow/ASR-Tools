@@ -910,7 +910,8 @@ class Window(QtWidgets.QDialog):
         self.ar_scene.setText(name + (u"　✔ AS rig" if ok else u"　✘ 找不到 AS 骨架"))
         self.ar_scene.setStyleSheet("color:%s" % ("#70d070" if ok else "#ff6060"))
         try:
-            self.ar_parts.setRigBones(self._core().retarget_bones() if ok else None)
+            from . import asMixamoASRetarget as asrt
+            self.ar_parts.setRigBones(asrt.pickable_bones() if ok else None)
         except Exception:
             self.ar_parts.setRigBones(None)
 

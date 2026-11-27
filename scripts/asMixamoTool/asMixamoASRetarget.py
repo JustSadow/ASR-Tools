@@ -27,6 +27,12 @@ def log(cb, msg):
         print(msg)
 
 
+def pickable_bones():
+    """Deform joints of the scene's rig whose controls can be picked: the retarget bones plus the palm cup (Cup_L/R,
+    on rigs that have one: no motion file has a cup, but another file of the same rig does)."""
+    return core.retarget_bones() + [c for c in ("Cup_L", "Cup_R") if cmds.objExists(c) and cmds.objExists("FK" + c)]
+
+
 def control_bones(ctrl, rig_bones):
     """Deform joints that a controller moves, or None if it isn't a body control (Main, props, hat, face...)."""
     side = ctrl[-2:] if ctrl[-2:] in ("_R", "_L", "_M") else ""
@@ -203,7 +209,7 @@ def as_retarget(src, parts=None, layer=None, others=True, cb=None):
         parts = set(parts)
         if not parts:
             raise RuntimeError(u"沒有選任何部位")
-    rig_bones = set(core.retarget_bones())
+    rig_bones = set(pickable_bones())
     old_range = (cmds.playbackOptions(q=True, min=True), cmds.playbackOptions(q=True, max=True))
 
     ns, i = "asRetargetSrc", 1
@@ -532,7 +538,7 @@ def copy_layers(src, names, parts=None, others=True, cb=None, base_plugs=None):
         parts = set(parts)
         if not parts:
             raise RuntimeError(u"沒有選任何部位")
-    rig_bones = set(core.retarget_bones())
+    rig_bones = set(pickable_bones())
     base = _scene_base_layer()
     log(cb, u"讀取來源：%s" % os.path.basename(src))
     ns = _import_src(src, cb)

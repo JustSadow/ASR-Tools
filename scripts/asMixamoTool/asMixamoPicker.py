@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Body-part picker for the retarget: one clickable region per AS deform joint that the Mixamo retarget drives
-(21 body bones + palm and 15 finger bones per hand = 51). Selected parts glow amber.
+(21 body bones + palm, cup and 15 finger bones per hand = 55). Selected parts glow amber.
 
 Art: an AI-generated silhouette, split into bones offline; the runtime files are in
 picker/ (body_off.png, body_on.png, body_ids.png = 8-bit bone id per pixel, picker.json = names + hand polygons)."""
@@ -15,7 +15,7 @@ HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "picker")
 FINGERS = ("Thumb", "Index", "Middle", "Ring", "Pinky")
 FINGER_ZH = {"Thumb": u"大拇指", "Index": u"食指", "Middle": u"中指", "Ring": u"無名指", "Pinky": u"小指"}
 BONE_ZH = {"Head_M": u"頭", "Neck_M": u"脖子", "Chest_M": u"胸", "Spine1_M": u"腰（脊椎）", "Root_M": u"骨盆（含整體位移）",
-           "Scapula": u"肩胛", "Shoulder": u"上臂", "Elbow": u"前臂", "Wrist": u"手掌",
+           "Scapula": u"肩胛", "Shoulder": u"上臂", "Elbow": u"前臂", "Wrist": u"手掌", "Cup": u"掌心外側 Cup（無名指／小指那側）",
            "Hip": u"大腿", "Knee": u"小腿", "Ankle": u"腳踝", "Toes": u"腳趾"}
 SIDE_ZH = {"L": u"左", "R": u"右"}
 
@@ -49,7 +49,7 @@ PRESETS = [
     (u"全身", lambda: all_bones()),
     (u"上半身", lambda: [b for b in all_bones() if not b.startswith(("Hip_", "Knee_", "Ankle_", "Toes_", "Root_"))]),
     (u"下半身", lambda: ["Root_M"] + ["%s_%s" % (b, s) for s in "LR" for b in ("Hip", "Knee", "Ankle", "Toes")]),
-    (u"雙手臂", lambda: ["%s_%s" % (b, s) for s in "LR" for b in ("Scapula", "Shoulder", "Elbow", "Wrist")] + finger_bones()),
+    (u"雙手臂", lambda: ["%s_%s" % (b, s) for s in "LR" for b in ("Scapula", "Shoulder", "Elbow", "Wrist", "Cup")] + finger_bones()),
     (u"只有手指", lambda: finger_bones()),
     (u"清除", lambda: []),
 ]
@@ -329,7 +329,11 @@ class PartsBox(QtWidgets.QWidget):
         saved = settings.value(key + "_parts", None)
         if saved:
             try:
-                self.picker.setSelection(json.loads(saved), emit=False)
+                names = json.loads(saved)
+                if settings.value(key + "_parts_cup", None) is None:
+                    # saved before the cup had its own tile: it went with the palm
+                    names += ["Cup_" + s for s in "LR" if "Wrist_" + s in names]
+                self.picker.setSelection(names, emit=False)
             except Exception:
                 pass
         self.bt.setChecked(settings.value(key + "_parts_open", "false") == "true")
@@ -353,6 +357,7 @@ class PartsBox(QtWidgets.QWidget):
         self.summary.setText(txt)
         self.summary.setStyleSheet("color:%s" % col)
         self.settings.setValue(self.key + "_parts", json.dumps(self.picker.selection()))
+        self.settings.setValue(self.key + "_parts_cup", "1")
         self.changed.emit()
 
     def setStyle(self, style):
